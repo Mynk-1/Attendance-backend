@@ -86,21 +86,44 @@ app.post('/api/attendance', async (req, res) => {
 });
 
 // Update an attendance record
-app.patch('/api/attendance/:id', async (req, res) => {
-  try {
-    const record = await AttendanceRecord.findById(req.params.id);
-    if (record) {
-      // Update present status
-      record.present = req.body.present;
-      const updatedRecord = await record.save();
-      res.json(updatedRecord);
-    } else {
-      res.status(404).json({ message: 'Record not found' });
+// Update an attendance record using academicYear and rollNo (for students) or empId (for staff)
+app.patch('/api/attendance', async (req, res) => {
+    const { type, academicYear, rollNo, empId, present } = req.body;
+  
+    try {
+      // Validate required fields
+      if (!type || !present) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+  
+      let query;
+      if (type === 'student') {
+        if (!academicYear || !rollNo) {
+          return res.status(400).json({ message: 'Academic year and roll number are required for students' });
+        }
+        query = { type, academicYear, rollNo };
+      } else if (type === 'staff') {
+        if (!empId) {
+          return res.status(400).json({ message: 'Employee ID is required for staff' });
+        }
+        query = { type, empId };
+      } else {
+        return res.status(400).json({ message: 'Invalid type' });
+      }
+  
+      // Find and update the record
+      const record = await AttendanceRecord.findOne(query);
+      if (record) {
+        record.present = present;
+        const updatedRecord = await record.save();
+        res.json(updatedRecord);
+      } else {
+        res.status(404).json({ message: 'Record not found' });
+      }
+    } catch (err) {
+      res.status(400).json({ message: err.message });
     }
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+  });
 
 // Start the server
 app.listen(PORT, () => {
