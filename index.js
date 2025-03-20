@@ -21,45 +21,62 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 
 // Routes
 
-// Get all attendance records for a specific date and type (student or staff)
-// Update the GET /api/attendance route
+// Get all attendance records for a specific date, month, year, and type
 app.get('/api/attendance', async (req, res) => {
-    const { date, type } = req.query;
-    try {
-      // Create date object from input string
-      const inputDate = new Date(date);
-      
-      // Set to UTC timezone and create date range
-      const startOfDay = new Date(Date.UTC(
-        inputDate.getUTCFullYear(),
-        inputDate.getUTCMonth(),
-        inputDate.getUTCDate(),
-        0, 0, 0, 0
-      ));
-      
-      const endOfDay = new Date(Date.UTC(
-        inputDate.getUTCFullYear(),
-        inputDate.getUTCMonth(),
-        inputDate.getUTCDate(),
-        23, 59, 59, 999
-      ));
-  
-      const records = await AttendanceRecord.find({
-        date: { $gte: startOfDay, $lte: endOfDay },
-        type
-      });
-      
-      res.json(records);
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  });
+  const { date, month, year, type } = req.query;
 
-// Add a new attendance record (for student or staff)
-app.post('/api/attendance', async (req, res) => {
-  const { type, rollNo, empId, name, year, designation, present, date } = req.body;
-  const record = new AttendanceRecord({ type, rollNo, empId, name, year, designation, present, date: new Date(date) });
   try {
+    // Validate input parameters
+    if (!date || !month || !year || !type) {
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
+
+    // Fetch records for the specific date, month, year, and type
+    const records = await AttendanceRecord.find({
+      date: parseInt(date),
+      month: parseInt(month),
+      year: parseInt(year),
+      type,
+    });
+
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Add a new attendance record
+app.post('/api/attendance', async (req, res) => {
+  const { type, name, rollNo, empId, year, designation, present, date, month } = req.body;
+
+  try {
+    // Validate required fields
+    if (!type || !name || !date || !month || !year) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Validate identifier based on type
+    if (type === 'student' && !rollNo) {
+      return res.status(400).json({ message: 'Roll No is required for students' });
+    }
+    if (type === 'staff' && !empId) {
+      return res.status(400).json({ message: 'Employee ID is required for staff' });
+    }
+
+    // Create new record
+    const record = new AttendanceRecord({
+      type,
+      name,
+      rollNo: type === 'student' ? rollNo : undefined, // Only for students
+      empId: type === 'staff' ? empId : undefined, // Only for staff
+      year: parseInt(year),
+      designation: type === 'staff' ? designation : undefined, // Only for staff
+      present: present || false, // Default to false if not provided
+      date: parseInt(date),
+      month: parseInt(month),
+    });
+
+    // Save to database
     const newRecord = await record.save();
     res.status(201).json(newRecord);
   } catch (err) {
@@ -67,11 +84,12 @@ app.post('/api/attendance', async (req, res) => {
   }
 });
 
-// Update an attendance record (for student or staff)
+// Update an attendance record
 app.patch('/api/attendance/:id', async (req, res) => {
   try {
     const record = await AttendanceRecord.findById(req.params.id);
     if (record) {
+      // Update present status
       record.present = req.body.present;
       const updatedRecord = await record.save();
       res.json(updatedRecord);
