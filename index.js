@@ -47,7 +47,7 @@ app.get('/api/attendance', async (req, res) => {
 
 // Add a new attendance record
 app.post('/api/attendance', async (req, res) => {
-  const { type, name, rollNo, empId, year, designation, present, date, month } = req.body;
+  const { type, name, rollNo, empId, academicYear, designation, present, date, month, year } = req.body;
 
   try {
     // Validate required fields
@@ -69,11 +69,12 @@ app.post('/api/attendance', async (req, res) => {
       name,
       rollNo: type === 'student' ? rollNo : undefined, // Only for students
       empId: type === 'staff' ? empId : undefined, // Only for staff
-      year: parseInt(year),
+      academicYear: type === 'student' ? academicYear : undefined, // Only for students
       designation: type === 'staff' ? designation : undefined, // Only for staff
       present: present || false, // Default to false if not provided
       date: parseInt(date),
       month: parseInt(month),
+      year: parseInt(year),
     });
 
     // Save to database
