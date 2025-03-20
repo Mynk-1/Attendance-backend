@@ -23,14 +23,22 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 
 // Get all attendance records for a specific date and type (student or staff)
 app.get('/api/attendance', async (req, res) => {
-  const { date, type } = req.query;
-  try {
-    const records = await AttendanceRecord.find({ date: new Date(date), type });
-    res.json(records);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+    const { date, type } = req.query;
+    try {
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0); // Start of day in UTC
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999); // End of day in UTC
+  
+      const records = await AttendanceRecord.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+        type,
+      });
+      res.json(records);
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 
 // Add a new attendance record (for student or staff)
 app.post('/api/attendance', async (req, res) => {
